@@ -214,10 +214,8 @@ To ensure readability, only a core set of terms is included in this section.
 
 Append-only Log (converges Ledger and Registry):
 
-: the verifiable append-only data structure that stores the collection of Signed Statements registered by a Transparency Service, often referred to as the Log, the Ledger, or the Registry.
-SCITT supports multiple Log and Receipt formats to accommodate Transparency Service implementations based on different verifiable data structures, such as chronological Merkle trees or sparse Merkle trees.
-
-TODO add a pointer to section Append-only Log Security Requirements
+: the verifiable append-only data structure that stores Signed Statements in a Transparency Service often referred to by the synonym, Registry, Log or Ledger.
+SCITT supports multiple Log and Receipt formats to accommodate different Transparency Service implementations, such as historical Merkle Trees and sparse Merkle Trees.
 
 Artifact:
 
@@ -245,9 +243,9 @@ An Issuer may be the owner or author of Artifacts, or an independent third party
 
 Receipt:
 
-: a cryptographic proof that a Signed Statement is recorded in the Append-only Log.
+: a Receipt is a cryptographic proof that a Signed Statement is recorded in the Append-only Log.
 Receipts are based on COSE Signed Merkle Tree Proofs {{-COMETRE}}.
-Receipts consist of an inclusion proof for the Signed Statement, a signature by the Transparency Service of the state of the Append-only Log, and additional metadata in the signature's protected headers to assist in auditing.
+Receipts consist of Transparency Service-specific inclusion proofs, a signature by the Transparency Service of the state of the Append-only Log, and additional metadata (contained in the signature's protected headers) to assist in auditing.
 
 Registration:
 
@@ -258,6 +256,10 @@ Registration Policy:
 : the pre-condition enforced by the Transparency Service before registering a Signed Statement, based on information in the non-opaque header and metadata contained in its COSE Envelope.
 A Transparency Service MAY implement any range of policies that meets their needs.
 However a Transparency Service can not alter the contents of the Signed Statements.
+
+Registry:
+
+: See Append-only Log
 
 Signed Statement:
 
@@ -617,40 +619,6 @@ For example, consider a Transparency Service implemented using a set of replicas
 Each replica MAY provide a recent attestation report for its TEE, binding their hardware platform to the software that runs the Transparency Service, the long-term public key of the service, and the key used by the replica for signing Receipts.
 This attestation evidence can be supplemented with Receipts for the software and configuration of the service, as measured in its attestation report.
 
-### Configuration
-
-The Transparency Service records its configuration in the Append-Only Log using Transparent Statements with distinguished media type `application/scitt-configuration`.
-
-The registration policy for statements with the media type suffix (`+<format>` is implementation-specific.
-The implementation SHOULD document them, for example defining the Issuers authorized to register configuration Signed Statements.
-
-The Transparency Service is configured by the last Transparent Statement of this type.
-The Transparency Service MUST register a Signed Statement that defines its initial configuration before registering any other Signed Statement.
-The Transparency Service MAY register an additional Signed Statement that updates its configuration.
-
-The Transparency Service provides an endpoint that returns the Transparent Statement that describes its current configuration.
-
-The configuration `reg_info` SHOULD include a secure version number and a timestamp.
-
-The sample configuration payload uses the CDDL
-
-~~~ cddl
-Signature_Algorithms = [ int ]
-
-Registration_Policy = {
-  * tstr => any
-}
-
-SCITT_Configuration = [
-  supported_signature_algs: Signature_Algorithms ; supported algorithms for signing Statement
-  ledger_alg: int ; type of verifiable data structure
-  service_uri: tstr; base URI of the transparency service, will be the issuer in the receipt CWT claim set
-  root_certificates: [ COSE_X509 ]
-  supported_apis: [ SCITT_Endpoint ]
-  registration_policies : Registration_Policy
-]
-~~~
-
 ### Registration Policies
 
 Authorization is needed prior to registration of Signed Statements to ensure completeness of an audit.
@@ -661,25 +629,22 @@ For example, some Transparency Services may validate the non-opaque content (pay
 Registration Policies refers to the checks that are performed before a Signed Statement is registered given a set of input values.
 This specification leaves the implementation of the Registration Policy to the provider of the Transparency Services and its users.
 
-A provider of a Transparency Service indicates what Registration Policy is used in a given deployment and inform its users about changes to the Registration Policy by issuing and registering configuration statements.
-
 As a minimum, a Transparency Service MUST authenticate the Issuer of the Signed Statement, which requires some form of trust anchor.
 As defined in {{RFC6024}}, "A trust anchor represents an authoritative entity via a public key and associated data.
 The public key is used to verify digital signatures, and the associated data is used to constrain the types of information for which the trust anchor is authoritative."
 The Trust Anchor may be a certificate, a raw public key or other structure, as appropriate.
 It can be a non-root certificate when it is a certificate.
 
+A provider of a Transparency Service is, however, expected to indicate what Registration Policy is used in a given deployment and inform its users about changes to the Registration Policy.
+
 ### Append-only Log Security Requirements
 
 There are many different candidate verifiable data structures that may be used to implement an Append-only Log, such as chronological Merkle Trees, sparse/indexed Merkle Trees, full blockchains, and many other variants.
-The Transparency Service MUST support Receipts that can be encoded as a COSE Signed Merkle Tree Proof for a choice of verifiable data structure that meets the requirements listed below. 
-The Transparency Service MAY additionally support Consistency Receipts for this data structure. 
-It is RECOMMENDED that verifiable data structures used for SCITT Receipts receive public cryptographic review on CFRG or a similar forum.
+The Transparency Service is only required to support concise Receipts (i.e., whose size grows at most logarithmically in the number of entries in the Append-only Log) that can be encoded as a COSE Signed Merkle Tree Proof.
 
-A Transparency Service MAY offer receipts for multiple signature algorithms, or change its choice of signature algorithm over time. 
-However, it it generally hard to change its verifiable data structure (including for instance internal hash functions) without breaking the security requirements of the Append-only Log.
-In such cases, it may be possible to maintain separate Append-only Log for multiple verifiable data structure in parallel, 
-and to provide additional proof of their mutual consistency. 
+It is possible to offer multiple signature algorithms for the COSE signature of receipts' Signed Merkle Tree, or to change the signing algorithm at later points.
+However, the Merkle Tree algorithm (including its internal hash function) cannot easily be changed without breaking the consistency of the Append-only Log.
+It is possible to maintain separate Registries for each algorithm in parallel but the Transparency Service is then responsible for proving their mutual consistency.
 
 #### Finality
 
@@ -691,7 +656,7 @@ In particular, once a Receipt is returned for a given Signed Statement, the regi
 
 There is no fork in the Append-only Log.
 Everyone with access to its contents sees the same sequence of entries, and can check its consistency with any Receipts they have collected.
-Transparency Service implementations MAY provide a mechanism to verify that the state of the Append-only Log, encoded in an old Receipt, is consistent with other Receipts or with the current Append-only Log state.
+Transparency Service implementations MAY provide a mechanism to verify that the state of the Append-only Log, encoded in an old Receipt, is consistent with the current Append-only Log state.
 
 #### Replayability and Auditing
 
